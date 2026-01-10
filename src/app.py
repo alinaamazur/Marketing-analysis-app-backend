@@ -88,10 +88,7 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         if followers and followers > 0:
             er_list.append((likes + comments) / followers * 100.0)  # percent
 
-    n = len(media_info) if media_info else 0
-    avg_likes = likes_sum / n if n else 0
-    avg_comments = comments_sum / n if n else 0
-    avg_engagement = sum(er_list) / n if n else 0
+    er = ((likes_sum + comments_sum) / followers * 100)
 
     # ER total by last N posts (percent); also prepare data for chart (per post)
     chart = []
@@ -99,16 +96,15 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         chart.append({
             "timestamp": p.get("timestamp"),
             "permalink": p.get("permalink"),
-            "er_percent": round(er, 4)
+            "er_percent": round(er, 2)
         })
 
     return {
         "followers": followers,
         "posts_count": posts_count,
-        "n_returned_posts": n,
-        "avg_likes": round(avg_likes, 2),
-        "avg_comments": round(avg_comments, 2),
-        "avg_engagement_percent": round(avg_engagement, 4),
+        "likes_sum": likes_sum,
+        "comments_sum": comments_sum,
+        "engagement_rate": round(er, 2),
         "posts": posts,
         "er_chart": chart,
     }

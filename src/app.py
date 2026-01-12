@@ -48,17 +48,19 @@ def call_graph(api_path: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
     return data
 
 def fetch_business_discovery(username: str, posts_limit: int = 10) -> Dict[str, Any]:
-    # fields: followers_count, media_count, media{like_count,comments_count,caption,timestamp,permalink}
+    # fields: name, profile_picture_url, followers_count, media_count, media{like_count,comments_count,caption,timestamp,permalink}
     fields = (
         f"business_discovery.username({username})"
-        "{followers_count,media_count,media.limit(%d){id,caption,like_count,comments_count,timestamp,permalink,media_type}}"
+        "{name,profile_picture_url,followers_count,media_count,media.limit(%d){id,caption,like_count,comments_count,timestamp,permalink,media_type}}"
         % posts_limit
     )
     data = call_graph(f"{IG_BUSINESS_ID}", params={"fields": fields})
     return data.get("business_discovery")
 
 def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
-    # compute averages and engagement
+    username = business_discovery.get("username")
+    name = business_discovery.get("name")
+    profile_picture_url = business_discovery.get("profile_picture_url")
     followers = business_discovery.get("followers_count")
     media_info = business_discovery.get("media", {}).get("data", [])
     posts_count = business_discovery.get("media_count") or len(media_info)
@@ -100,6 +102,9 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         })
 
     return {
+        "username": username,
+        "name": name,
+        "profile_picture_url": profile_picture_url,
         "followers": followers,
         "posts_count": posts_count,
         "likes_sum": likes_sum,

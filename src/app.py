@@ -51,7 +51,7 @@ def fetch_business_discovery(username: str, posts_limit: int = 10) -> Dict[str, 
     # fields: name, profile_picture_url, followers_count, media_count, media{like_count,comments_count,caption,timestamp,permalink}
     fields = (
         f"business_discovery.username({username})"
-        "{name,profile_picture_url,followers_count,media_count,media.limit(%d){id,caption,like_count,comments_count,timestamp,permalink,media_type}}"
+        "{name,profile_picture_url,followers_count,media_count,media.limit(%d){id,caption,like_count,comments_count,timestamp,permalink,media_type,media_url}}"
         % posts_limit
     )
     data = call_graph(f"{IG_BUSINESS_ID}", params={"fields": fields})
@@ -68,7 +68,6 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
     posts = []
     likes_sum = 0
     comments_sum = 0
-    er_list = []  # engagement per post = (likes + comments) / followers
 
     for p in media_info:
         likes = p.get("like_count") or 0
@@ -76,30 +75,27 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         timestamp = p.get("timestamp")
         permalink = p.get("permalink")
         caption = p.get("caption") or ""
+        media_url = p.get("media_url")
+
+        er_post = 0
+        if followers and followers > 0:
+            er_post = (likes + comments) / followers * 100
+            
         posts.append({
             "id": p.get("id"),
+            "post_url": media_url,
             "caption": caption,
             "likes": likes,
             "comments": comments,
             "timestamp": timestamp,
             "permalink": permalink,
-            "media_type": p.get("media_type")
+            "media_type": p.get("media_type"),
+            "er": round(er_post, 2),
         })
         likes_sum += likes
         comments_sum += comments
-        if followers and followers > 0:
-            er_list.append((likes + comments) / followers * 100.0)  # percent
 
     er = ((likes_sum + comments_sum) / followers * 100)
-
-    # ER total by last N posts (percent); also prepare data for chart (per post)
-    chart = []
-    for p, er in zip(media_info, er_list):
-        chart.append({
-            "timestamp": p.get("timestamp"),
-            "permalink": p.get("permalink"),
-            "er_percent": round(er, 2)
-        })
 
     return {
         "username": username,
@@ -111,7 +107,6 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         "comments_sum": comments_sum,
         "engagement_rate": round(er, 2),
         "posts": posts,
-        "er_chart": chart,
     }
 
 @app.get("/api/instagram/analysis")
@@ -123,7 +118,6 @@ def instagram_analysis(url: str = Query(..., description="Full Instagram profile
       - avg_likes, avg_comments
       - avg_engagement_percent
       - posts[]
-      - er_chart[]
     """
     try:
         username = extract_username(url)

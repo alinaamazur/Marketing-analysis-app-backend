@@ -6,6 +6,8 @@ import requests
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from sentiment.predict import predict_sentiment
+from collections import Counter
 
 load_dotenv()
 
@@ -57,6 +59,20 @@ def fetch_business_discovery(username: str, posts_limit: int = 10) -> Dict[str, 
     data = call_graph(f"{IG_BUSINESS_ID}", params={"fields": fields})
     return data.get("business_discovery")
 
+def aggregate_sentiments(posts: list) -> dict:
+    sentiments = [p["sentiment"] for p in posts if p.get("sentiment")]
+    total = len(sentiments)
+    counts = Counter(sentiments)
+
+    result = {}
+    for label in ["Positive", "Neutral", "Negative"]:
+        result[label] = {
+            "count": counts.get(label, 0),
+            "percent": round(counts.get(label, 0) / total * 100, 2) if total > 0 else 0
+        }
+
+    return result
+
 def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
     username = business_discovery.get("username")
     name = business_discovery.get("name")
@@ -80,7 +96,9 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         er_post = 0
         if followers and followers > 0:
             er_post = (likes + comments) / followers * 100
-            
+
+        sentiment = predict_sentiment(caption, brand=name or username)
+
         posts.append({
             "id": p.get("id"),
             "post_url": media_url,
@@ -91,11 +109,15 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
             "permalink": permalink,
             "media_type": p.get("media_type"),
             "er": round(er_post, 2),
+            "sentiment": sentiment
         })
+
         likes_sum += likes
         comments_sum += comments
 
-    er = ((likes_sum + comments_sum) / followers * 100)
+    er = ((likes_sum + comments_sum) / followers * 100) if followers and followers > 0 else 0
+
+    sentiment_summary = aggregate_sentiments(posts)
 
     return {
         "username": username,
@@ -107,7 +129,9 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
         "comments_sum": comments_sum,
         "engagement_rate": round(er, 2),
         "posts": posts,
+        "sentiment_summary": sentiment_summary
     }
+
 
 @app.get("/api/instagram/analysis")
 def instagram_analysis(url: str = Query(..., description="Full Instagram profile url, e.g. https://www.instagram.com/nike/"), posts_limit: int = 10):

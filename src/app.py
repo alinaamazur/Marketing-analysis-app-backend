@@ -49,7 +49,7 @@ def call_graph(api_path: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail={"graph_error": message})
     return data
 
-def fetch_business_discovery(username: str, posts_limit: int = 10) -> Dict[str, Any]:
+def fetch_business_discovery(username: str, posts_limit: int = 200) -> Dict[str, Any]:
     # fields: name, profile_picture_url, followers_count, media_count, media{like_count,comments_count,caption,timestamp,permalink}
     fields = (
         f"business_discovery.username({username})"
@@ -134,7 +134,7 @@ def compute_metrics(business_discovery: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @app.get("/api/instagram/analysis")
-def instagram_analysis(url: str = Query(..., description="Full Instagram profile url, e.g. https://www.instagram.com/nike/"), posts_limit: int = 10):
+def instagram_analysis(url: str = Query(..., description="Full Instagram profile url, e.g. https://www.instagram.com/nike/"), posts_limit: int = 200):
     """
     Returns:
       - followers
